@@ -10,4 +10,6 @@ readme = "README.md"
 repository = "https://github.com/rust-windowing/glutin_x11_sym"
 documentation = "https://docs.rs/glutin_x11_sym"
 
-[dependencies]
+[target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
+x11-dl = "2.18.3"
+lazy_static = "1.4.0"
