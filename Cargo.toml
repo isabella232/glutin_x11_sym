@@ -1,0 +1,13 @@
+[package]
+name = "glutin_x11_sym"
+version = "0.1.0"
+authors = ["The glutin contributors", "Freya Gentz <zegentzy@protonmail.com>"]
+edition = "2018"
+description = "Types shared between winit and sister crates."
+keywords = ["windowing", "opengl"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/rust-windowing/glutin_x11_sym"
+documentation = "https://docs.rs/glutin_x11_sym"
+
+[dependencies]
