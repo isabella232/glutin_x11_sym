@@ -13,3 +13,6 @@ documentation = "https://docs.rs/glutin_x11_sym"
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))'.dependencies]
 x11-dl = "2.18.3"
 lazy_static = "1.4.0"
+winit_types = { version = "0.1.0", path = "../winit_types" }
+parking_lot = "0.10"
+log = "0.4"
