@@ -74,12 +74,14 @@ macro_rules! lsyms {
 pub struct Display {
     pub display: *mut x11_dl::xlib::Display,
     pub latest_error: Mutex<Option<Error>>,
+    owned: bool,
 }
 
 unsafe impl Send for Display {}
 unsafe impl Sync for Display {}
 
 impl Display {
+    #[inline]
     fn new() -> Result<Display, Error> {
         let xlib = lsyms!(XLIB);
         unsafe { (xlib.XInitThreads)() };
@@ -99,6 +101,23 @@ impl Display {
         Ok(Display {
             display,
             latest_error: Mutex::new(None),
+            owned: true,
+        })
+    }
+
+    #[inline]
+    pub fn from_raw(display: *mut raw::c_void) -> Arc<Display> {
+        if let Ok(ref x11_display) = *X11_DISPLAY.lock() {
+            if x11_display.display == display as *mut _ {
+                return Arc::clone(x11_display);
+            }
+        }
+
+        warn!("X11 display not X11_DISPLAY's display, users of this display will not know errors.");
+        Arc::new(Display {
+            display: display as *mut _,
+            latest_error: Mutex::new(None),
+            owned: false,
         })
     }
 
@@ -123,8 +142,10 @@ impl Display {
 impl Drop for Display {
     #[inline]
     fn drop(&mut self) {
-        let xlib = lsyms!(XLIB);
-        unsafe { (xlib.XCloseDisplay)(self.display) };
+        if self.owned {
+            let xlib = lsyms!(XLIB);
+            unsafe { (xlib.XCloseDisplay)(self.display) };
+        }
     }
 }
 
