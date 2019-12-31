@@ -50,7 +50,7 @@ lazy_static! {
         x11_dl::xtest::Xf86vmode::open();
     pub static ref XRECORD_XF86VMODE: Result<x11_dl::xrecord::Xf86vmode, OpenError> =
         x11_dl::xrecord::Xf86vmode::open();
-    pub static ref XINERAMA_XLIB: Result<x11_dl::xinerama::Xlib, OpenError> =
+    pub static ref XINERAMA: Result<x11_dl::xinerama::Xlib, OpenError> =
         x11_dl::xinerama::Xlib::open();
     pub static ref XLIB: Result<x11_dl::xlib::Xlib, OpenError> = x11_dl::xlib::Xlib::open();
     pub static ref XLIB_XCB: Result<x11_dl::xlib_xcb::Xlib_xcb, OpenError> =
