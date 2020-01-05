@@ -61,6 +61,7 @@ lazy_static! {
 lazy_static! {
     pub static ref X11_DISPLAY: Mutex<Result<Arc<Display>, Error>> = { Mutex::new(Display::new()) };
     pub static ref DISPLAYS: Mutex<Vec<Weak<Display>>> = Mutex::new(vec![]);
+    pub static ref LATEST_ERROR: Mutex<Option<Error>> = Mutex::new(None);
 }
 
 #[macro_export]
@@ -77,7 +78,6 @@ macro_rules! lsyms {
 #[derive(Debug)]
 pub struct Display {
     pub display: *mut x11_dl::xlib::Display,
-    pub latest_error: Mutex<Option<Error>>,
     owned: bool,
 }
 
@@ -105,7 +105,6 @@ impl Display {
 
         let ret = Arc::new(Display {
             display,
-            latest_error: Mutex::new(None),
             owned: true,
         });
 
@@ -126,7 +125,6 @@ impl Display {
 
         let ret = Arc::new(Display {
             display: ndisp as *mut _,
-            latest_error: Mutex::new(None),
             owned: false,
         });
 
@@ -138,7 +136,7 @@ impl Display {
     /// Checks whether an error has been triggered by the previous function calls.
     #[inline]
     pub fn check_errors(&self) -> Result<(), Error> {
-        let error = self.latest_error.lock().take();
+        let error = LATEST_ERROR.lock().take();
         if let Some(error) = error {
             Err(error)
         } else {
@@ -149,7 +147,7 @@ impl Display {
     /// Ignores any previous error.
     #[inline]
     pub fn ignore_error(&self) {
-        *self.latest_error.lock() = None;
+        *LATEST_ERROR.lock() = None;
     }
 }
 
@@ -161,6 +159,7 @@ impl Drop for Display {
             unsafe { (xlib.XCloseDisplay)(self.display) };
         }
 
+        // Do some pruning
         DISPLAYS
             .lock()
             .drain_filter(|display| display.strong_count() == 0)
@@ -173,31 +172,28 @@ unsafe extern "C" fn x_error_callback(
     event: *mut x11_dl::xlib::XErrorEvent,
 ) -> raw::c_int {
     let xlib = lsyms!(XLIB);
-    for display in &*DISPLAYS.lock() {
-        if let Some(display) = display.upgrade() {
-            // `assume_init` is safe here because the array consists of `MaybeUninit` values,
-            // which do not require initialization.
-            let mut buf: [MaybeUninit<raw::c_char>; 1024] = MaybeUninit::uninit().assume_init();
-            (xlib.XGetErrorText)(
-                display_ptr,
-                (*event).error_code as raw::c_int,
-                buf.as_mut_ptr() as *mut raw::c_char,
-                buf.len() as raw::c_int,
-            );
-            let description = CStr::from_ptr(buf.as_ptr() as *const raw::c_char).to_string_lossy();
+    // `assume_init` is safe here because the array consists of `MaybeUninit` values,
+    // which do not require initialization.
+    let mut buf: [MaybeUninit<raw::c_char>; 1024] = MaybeUninit::uninit().assume_init();
+    (xlib.XGetErrorText)(
+        display_ptr,
+        (*event).error_code as raw::c_int,
+        buf.as_mut_ptr() as *mut raw::c_char,
+        buf.len() as raw::c_int,
+    );
+    let description = CStr::from_ptr(buf.as_ptr() as *const raw::c_char).to_string_lossy();
 
-            let error = make_oserror!(OsError::XError(XError {
-                description: description.into_owned(),
-                error_code: (*event).error_code,
-                request_code: (*event).request_code,
-                minor_code: (*event).minor_code,
-            }));
+    let error = make_oserror!(OsError::XError(XError {
+        description: description.into_owned(),
+        error_code: (*event).error_code,
+        request_code: (*event).request_code,
+        minor_code: (*event).minor_code,
+    }));
 
-            error!("X11 error: {:#?}", error);
+    error!("X11 error: {:#?}", error);
 
-            *display.latest_error.lock() = Some(error);
-        }
-    }
+    *LATEST_ERROR.lock() = Some(error);
+
     // Fun fact: this return value is completely ignored.
     0
 }
