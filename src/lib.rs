@@ -1,4 +1,3 @@
-#![feature(weak_counts, drain_filter)]
 #![cfg(any(
     target_os = "linux",
     target_os = "dragonfly",
@@ -160,10 +159,12 @@ impl Drop for Display {
         }
 
         // Do some pruning
-        DISPLAYS
-            .lock()
-            .drain_filter(|display| display.strong_count() == 0)
-            .last();
+        let mut displays = DISPLAYS.lock();
+
+        *displays = displays
+            .drain(..)
+            .filter(|display| display.upgrade().is_some())
+            .collect();
     }
 }
 
