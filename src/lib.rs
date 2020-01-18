@@ -76,12 +76,19 @@ macro_rules! lsyms {
 
 #[derive(Debug)]
 pub struct Display {
-    pub display: *mut x11_dl::xlib::Display,
+    display: *mut x11_dl::xlib::Display,
     owned: bool,
 }
 
 unsafe impl Send for Display {}
 unsafe impl Sync for Display {}
+
+impl PartialEq for Display {
+    fn eq(&self, o: &Self) -> bool {
+        self.display == o.display
+    }
+}
+impl Eq for Display {}
 
 impl Display {
     #[inline]
@@ -110,6 +117,11 @@ impl Display {
         DISPLAYS.lock().push(Arc::downgrade(&ret));
 
         Ok(ret)
+    }
+
+    #[inline]
+    pub fn raw(&self) -> *mut raw::c_void {
+        self.display as *mut _
     }
 
     #[inline]
