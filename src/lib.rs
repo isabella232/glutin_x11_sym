@@ -17,6 +17,7 @@ use parking_lot::Mutex;
 use winit_types::error::Error;
 use winit_types::platform::{OsError, XError, XNotSupported};
 use x11_dl::error::OpenError;
+use x11_dl::xlib::{XErrorEvent, Display as XDisplay};
 
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -60,6 +61,8 @@ lazy_static! {
 lazy_static! {
     pub static ref X11_DISPLAY: Mutex<Result<Arc<Display>, Error>> = { Mutex::new(Display::new()) };
     pub static ref DISPLAYS: Mutex<Vec<Weak<Display>>> = Mutex::new(vec![]);
+    pub static ref OLD_HANDLERS: Mutex<Vec<unsafe extern "C" fn(_: *mut XDisplay, _: *mut XErrorEvent) -> raw::c_int
+        >> = Mutex::new(vec![]);
     pub static ref LATEST_ERROR: Mutex<Option<Error>> = Mutex::new(None);
 }
 
@@ -96,7 +99,14 @@ impl Display {
         let xlib = lsyms!(XLIB);
         unsafe { (xlib.XInitThreads)() };
         // FIXME: old handlers...
-        let _old_handler = unsafe { (xlib.XSetErrorHandler)(Some(x_error_callback)) };
+        let old_handler = unsafe { (xlib.XSetErrorHandler)(Some(x_error_callback)) };
+
+        match old_handler {
+            Some(old_handler) if old_handler != x_error_callback => {
+                OLD_HANDLERS.lock().push(old_handler);
+            }
+            _ => (),
+        }
 
         // calling XOpenDisplay
         let display = unsafe {
@@ -206,6 +216,10 @@ unsafe extern "C" fn x_error_callback(
     error!("X11 error: {:#?}", error);
 
     *LATEST_ERROR.lock() = Some(error);
+
+    for old_handler in OLD_HANDLERS.lock().iter().rev() {
+        old_handler(display_ptr, event);
+    }
 
     // Fun fact: this return value is completely ignored.
     0
