@@ -17,7 +17,7 @@ use parking_lot::Mutex;
 use winit_types::error::Error;
 use winit_types::platform::{OsError, XError, XNotSupported};
 use x11_dl::error::OpenError;
-use x11_dl::xlib::{XErrorEvent, Display as XDisplay};
+use x11_dl::xlib::{Display as XDisplay, XErrorEvent};
 
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -61,8 +61,8 @@ lazy_static! {
 lazy_static! {
     pub static ref X11_DISPLAY: Mutex<Result<Arc<Display>, Error>> = { Mutex::new(Display::new()) };
     pub static ref DISPLAYS: Mutex<Vec<Weak<Display>>> = Mutex::new(vec![]);
-    pub static ref OLD_HANDLERS: Mutex<Vec<unsafe extern "C" fn(_: *mut XDisplay, _: *mut XErrorEvent) -> raw::c_int
-        >> = Mutex::new(vec![]);
+    pub static ref OLD_HANDLERS: Mutex<Vec<unsafe extern "C" fn(_: *mut XDisplay, _: *mut XErrorEvent) -> raw::c_int>> =
+        Mutex::new(vec![]);
     pub static ref LATEST_ERROR: Mutex<Option<Error>> = Mutex::new(None);
 }
 
